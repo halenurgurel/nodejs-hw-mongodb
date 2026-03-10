@@ -28,7 +28,7 @@ export const setupServer = () => {
   );
 
   //routers
-  app.use('/contacts', contactsRouter);
+  app.use(contactsRouter);
 
   //invalid route
   app.use('*path', notFoundHandler);
