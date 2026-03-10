@@ -2,13 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import pino from 'pino-http';
 import { env } from './utils/env.js';
-import { getAllContacts, getContactsById } from './services/contacts.js';
+import contactsRouter from './routers/contacts.js';
+import { notFoundHandler } from './middlewares/notFoundHandler.js';
+import { errorHandler } from './middlewares/errorHandler.js';
 
+//Start server
 const PORT = Number(env('PORT', 3000));
 
 export const setupServer = () => {
   const app = express();
 
+  //Middleware integrated with Express for processing (parsing) JSON data in requests.
   app.use(express.json());
 
   //cors
@@ -23,43 +27,16 @@ export const setupServer = () => {
     }),
   );
 
-  //Get contacts
-  app.get('/contacts', async (req, res) => {
-    const contacts = await getAllContacts();
-    res.status(200).json({
-      status: 200,
-      message: 'Successfully found contacts!',
-      data: contacts,
-    });
-  });
-
-  //Get contactsbyId
-  app.get('/contacts/:contactId', async (req, res) => {
-    const { contactId } = req.params;
-    const contact = await getContactsById(contactId);
-
-    //if contact cannot be found
-    if (!contact) {
-      res.status(404).json({
-        message: 'Contact not found',
-      });
-      return;
-    }
-
-    res.status(200).json({
-      status: 200,
-      message: `Successfully found contact with id ${contactId}!`,
-      data: contact,
-    });
-  });
+  //routers
+  app.use('/contacts', contactsRouter);
 
   //invalid route
-  app.use('*splat', (req, res, next) => {
-    res.status(404).json({
-      message: 'Not found',
-    });
-  });
+  app.use('*path', notFoundHandler);
 
+  //unexpected errors
+  app.use(errorHandler);
+
+  //returns a message indicating that the server is running and on which port it is listening for requests
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
