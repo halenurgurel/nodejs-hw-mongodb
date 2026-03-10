@@ -56,15 +56,23 @@ Server is running on port 3000
 ```
 src/
 ├── index.js                  # Entry point — connects DB then starts server
-├── server.js                 # Express app setup and route definitions
+├── server.js                 # Express app setup and route mounting
 ├── db/
 │   ├── initMongoConnection.js  # Mongoose connection logic
 │   └── models/
 │       └── contact.js          # Contact Mongoose model
+├── controllers/
+│   └── contacts.js             # Route handler functions
+├── routers/
+│   └── contacts.js             # Express router — defines all /contacts routes
+├── middlewares/
+│   ├── notFoundHandler.js      # 404 handler for unknown routes
+│   └── errorHandler.js         # Global error handler
 ├── services/
 │   └── contacts.js             # Database query functions
 └── utils/
-    └── env.js                  # Helper to read environment variables
+    ├── env.js                  # Helper to read environment variables
+    └── ctrlWrapper.js          # Wraps controllers with try/catch error handling
 ```
 
 ## API Endpoints
@@ -118,6 +126,100 @@ Returns a single contact by ID.
   }
 }
 ```
+
+**Response `404` (contact not found):**
+
+```json
+{
+  "message": "Contact not found"
+}
+```
+
+---
+
+### POST /contacts
+
+Creates a new contact.
+
+**Request body:**
+
+```json
+{
+  "name": "John Doe",
+  "phoneNumber": "+1234567890",
+  "email": "john@example.com",
+  "isFavourite": false,
+  "contactType": "personal"
+}
+```
+
+**Response `201`:**
+
+```json
+{
+  "status": 201,
+  "message": "Successfully created a contact",
+  "data": {
+    "_id": "...",
+    "name": "John Doe",
+    "phoneNumber": "+1234567890",
+    "email": "john@example.com",
+    "isFavourite": false,
+    "contactType": "personal",
+    "createdAt": "...",
+    "updatedAt": "..."
+  }
+}
+```
+
+---
+
+### PATCH /contacts/:contactId
+
+Partially updates an existing contact. Only send the fields you want to change.
+
+**Request body (example):**
+
+```json
+{
+  "email": "newemail@example.com"
+}
+```
+
+**Response `200`:**
+
+```json
+{
+  "status": 200,
+  "message": "Successfully patched a contact!",
+  "data": {
+    "_id": "...",
+    "name": "John Doe",
+    "phoneNumber": "+1234567890",
+    "email": "newemail@example.com",
+    "isFavourite": false,
+    "contactType": "personal",
+    "createdAt": "...",
+    "updatedAt": "..."
+  }
+}
+```
+
+**Response `404` (contact not found):**
+
+```json
+{
+  "message": "Contact not found"
+}
+```
+
+---
+
+### DELETE /contacts/:contactId
+
+Deletes a contact by ID.
+
+**Response `204`:** No content.
 
 **Response `404` (contact not found):**
 
