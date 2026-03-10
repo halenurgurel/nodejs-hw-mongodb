@@ -1,4 +1,4 @@
-# nodejs-hw-mongodb
+# Node.js MongoDB - CRUD
 
 A RESTful API for managing contacts, built with Node.js, Express, and MongoDB (Mongoose).
 
