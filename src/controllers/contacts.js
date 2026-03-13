@@ -6,14 +6,41 @@ import {
   deleteContact,
 } from '../services/contacts.js';
 import createHttpError from 'http-errors';
+import { parsePaginationParams } from '../utils/parsePaginationParams.js';
+import { calculatePaginationData } from '../utils/calculatePaginationData.js';
+import { parseSortParams } from '../utils/parseSortParams.js';
+import { parseFilterParams } from '../utils/parseFilterParams.js';
 
 //GET 200 all contacts
 export const getAllContactsController = async (req, res) => {
-  const contacts = await getAllContacts();
+  //pagination
+  const { page, perPage } = parsePaginationParams(req.query);
+
+  //sort
+  const { sortBy, sortOrder } = parseSortParams(req.query);
+
+  //filter
+  const filter = parseFilterParams(req.query);
+
+  const { contacts, totalItems } = await getAllContacts({
+    page,
+    perPage,
+    sortBy,
+    sortOrder,
+    filter,
+  });
+  const paginationData = calculatePaginationData(totalItems, page, perPage);
+
   res.status(200).json({
     status: 200,
     message: 'Successfully found contacts!',
-    data: contacts,
+    data: {
+      data: contacts,
+      page,
+      perPage,
+      totalItems,
+      ...paginationData,
+    },
   });
 };
 

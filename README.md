@@ -70,16 +70,40 @@ src/
 │   └── errorHandler.js         # Global error handler
 ├── services/
 │   └── contacts.js             # Database query functions
+├── constants/
+│   └── index.js                # Shared constants (SORT_ORDER)
+├── validation/
+│   └── contacts.js             # Joi validation schemas
 └── utils/
     ├── env.js                  # Helper to read environment variables
-    └── ctrlWrapper.js          # Wraps controllers with try/catch error handling
+    ├── ctrlWrapper.js          # Wraps controllers with try/catch error handling
+    ├── parsePaginationParams.js # Parses page and perPage from query string
+    ├── calculatePaginationData.js # Calculates totalPages, hasPreviousPage, hasNextPage
+    ├── parseSortParams.js      # Parses and validates sortBy and sortOrder
+    └── parseFilterParams.js    # Parses and validates type and isFavourite filters
 ```
 
 ## API Endpoints
 
 ### GET /contacts
 
-Returns all contacts.
+Returns a paginated, sortable, and filterable list of contacts.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | number | `1` | Page number |
+| `perPage` | number | `10` | Items per page |
+| `sortBy` | string | `_id` | Sort field: `name`, `email`, `phoneNumber`, `contactType`, `isFavourite`, `createdAt`, `updatedAt` |
+| `sortOrder` | string | `asc` | Sort direction: `asc` or `desc` |
+| `type` | string | — | Filter by contact type: `work`, `home`, `personal` |
+| `isFavourite` | boolean | — | Filter by favourite: `true` or `false` |
+
+**Example request:**
+```
+GET /contacts?page=2&perPage=4&sortBy=name&sortOrder=asc&type=work&isFavourite=true
+```
 
 **Response `200`:**
 
@@ -87,18 +111,26 @@ Returns all contacts.
 {
   "status": 200,
   "message": "Successfully found contacts!",
-  "data": [
-    {
-      "_id": "...",
-      "name": "John Doe",
-      "phoneNumber": "+1234567890",
-      "email": "john@example.com",
-      "isFavourite": false,
-      "contactType": "personal",
-      "createdAt": "...",
-      "updatedAt": "..."
-    }
-  ]
+  "data": {
+    "data": [
+      {
+        "_id": "...",
+        "name": "John Doe",
+        "phoneNumber": "+1234567890",
+        "email": "john@example.com",
+        "isFavourite": true,
+        "contactType": "work",
+        "createdAt": "...",
+        "updatedAt": "..."
+      }
+    ],
+    "page": 2,
+    "perPage": 4,
+    "totalItems": 6,
+    "totalPages": 2,
+    "hasPreviousPage": true,
+    "hasNextPage": false
+  }
 }
 ```
 
