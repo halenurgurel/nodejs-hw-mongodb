@@ -28,6 +28,7 @@ export const getAllContactsController = async (req, res) => {
     sortBy,
     sortOrder,
     filter,
+    userId: req.user._id,
   });
   const paginationData = calculatePaginationData(totalItems, page, perPage);
 
@@ -47,7 +48,7 @@ export const getAllContactsController = async (req, res) => {
 //GET 200 contacts by id
 export const getContactsByIdController = async (req, res) => {
   const { contactId } = req.params;
-  const contact = await getContactsById(contactId);
+  const contact = await getContactsById(contactId, req.user._id);
 
   //if contact cannot be found
   if (!contact) {
@@ -63,7 +64,7 @@ export const getContactsByIdController = async (req, res) => {
 //POST 201 - create contact
 //req.body containt json data sent by the client and parsed by express
 export const createContactController = async (req, res) => {
-  const contact = await createContact(req.body);
+  const contact = await createContact({ ...req.body, userId: req.user._id });
   res.status(201).json({
     status: 201,
     message: 'Successfully created a contact',
@@ -74,7 +75,7 @@ export const createContactController = async (req, res) => {
 //PATCH 200 - update contact
 export const updateContactController = async (req, res) => {
   const { contactId } = req.params;
-  const contact = await updateContact(contactId, req.body);
+  const contact = await updateContact(contactId, req.user._id, req.body);
 
   if (!contact) {
     throw createHttpError(404, 'Contact not found');
@@ -89,10 +90,11 @@ export const updateContactController = async (req, res) => {
 //DELETE 204 - delete contact
 export const deleteContactController = async (req, res) => {
   const { contactId } = req.params;
-  const contact = await deleteContact(contactId);
+  const contact = await deleteContact(contactId, req.user._id);
 
   if (!contact) {
     throw createHttpError(404, 'Contact not found');
   }
   res.status(204).send();
 };
+//by filtering with both _id and userId in the service layer, a user trying to access another user's contact will simply get null back, resulting 404, not a security leak

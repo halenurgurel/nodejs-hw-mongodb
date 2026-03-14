@@ -1,6 +1,6 @@
-# Node.js MongoDB - CRUD
+# Node.js MongoDB - Contacts API with Authentication
 
-A RESTful API for managing contacts, built with Node.js, Express, and MongoDB (Mongoose).
+A RESTful API for managing contacts with JWT-based authentication, built with Node.js, Express, and MongoDB (Mongoose).
 
 ## Requirements
 
@@ -55,25 +55,34 @@ Server is running on port 3000
 
 ```
 src/
-├── index.js                  # Entry point — connects DB then starts server
-├── server.js                 # Express app setup and route mounting
+├── index.js                    # Entry point — connects DB then starts server
+├── server.js                   # Express app setup and route mounting
 ├── db/
 │   ├── initMongoConnection.js  # Mongoose connection logic
 │   └── models/
-│       └── contact.js          # Contact Mongoose model
+│       ├── contact.js          # Contact Mongoose model
+│       ├── user.js             # User Mongoose model
+│       └── session.js          # Session Mongoose model
 ├── controllers/
-│   └── contacts.js             # Route handler functions
+│   ├── contacts.js             # Contact route handler functions
+│   └── auth.js                 # Auth route handler functions
 ├── routers/
-│   └── contacts.js             # Express router — defines all /contacts routes
+│   ├── contacts.js             # Express router — defines all /contacts routes
+│   └── auth.js                 # Express router — defines all /auth routes
 ├── middlewares/
+│   ├── authenticate.js         # Bearer token authentication middleware
+│   ├── validateBody.js         # Joi request body validation middleware
+│   ├── isValid.js              # MongoDB ObjectId validation middleware
 │   ├── notFoundHandler.js      # 404 handler for unknown routes
 │   └── errorHandler.js         # Global error handler
 ├── services/
-│   └── contacts.js             # Database query functions
+│   ├── contacts.js             # Contact database query functions
+│   └── auth.js                 # Auth database query functions
 ├── constants/
-│   └── index.js                # Shared constants (SORT_ORDER)
+│   └── index.js                # Shared constants (SORT_ORDER, FIFTEEN_MINUTES, THIRTY_DAYS)
 ├── validation/
-│   └── contacts.js             # Joi validation schemas
+│   ├── contacts.js             # Joi validation schemas for contacts
+│   └── auth.js                 # Joi validation schemas for auth
 └── utils/
     ├── env.js                  # Helper to read environment variables
     ├── ctrlWrapper.js          # Wraps controllers with try/catch error handling
@@ -83,27 +92,145 @@ src/
     └── parseFilterParams.js    # Parses and validates type and isFavourite filters
 ```
 
-## API Endpoints
+## Authentication
+
+All `/contacts` routes are protected and require a valid Bearer token in the `Authorization` header:
+
+```
+Authorization: Bearer <accessToken>
+```
+
+Access tokens expire after **15 minutes**. Use `POST /auth/refresh` to get a new one using the refresh token stored in cookies.
+
+---
+
+## Auth Endpoints
+
+### POST /auth/register
+
+Registers a new user.
+
+**Request body:**
+
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "secret123"
+}
+```
+
+**Response `201`:**
+
+```json
+{
+  "status": 201,
+  "message": "Successfully registered a user!",
+  "data": {
+    "_id": "...",
+    "name": "John Doe",
+    "email": "john@example.com"
+  }
+}
+```
+
+**Response `409` (email already in use):**
+
+```json
+{
+  "message": "Email in use"
+}
+```
+
+---
+
+### POST /auth/login
+
+Logs in a user. Sets `refreshToken` and `sessionId` as `httpOnly` cookies and returns the `accessToken` in the response body.
+
+**Request body:**
+
+```json
+{
+  "email": "john@example.com",
+  "password": "secret123"
+}
+```
+
+**Response `200`:**
+
+```json
+{
+  "status": 200,
+  "message": "Successfully logged in an user!",
+  "data": {
+    "accessToken": "<token>"
+  }
+}
+```
+
+**Response `401` (invalid credentials):**
+
+```json
+{
+  "message": "Unauthorized"
+}
+```
+
+---
+
+### POST /auth/refresh
+
+Refreshes the session using the `refreshToken` cookie. Issues a new access token and rotates the refresh token.
+
+**Response `200`:**
+
+```json
+{
+  "status": 200,
+  "message": "Successfully refreshed a session!",
+  "data": {
+    "accessToken": "<newToken>"
+  }
+}
+```
+
+**Response `401` (session not found or token expired):**
+
+```json
+{
+  "message": "Session not found"
+}
+```
+
+---
+
+### POST /auth/logout
+
+Logs out the user by deleting the session and clearing cookies.
+
+**Response `204`:** No content.
+
+---
+
+## Contact Endpoints
+
+All contact endpoints require `Authorization: Bearer <accessToken>` header. Users can only access their own contacts.
 
 ### GET /contacts
 
-Returns a paginated, sortable, and filterable list of contacts.
+Returns a paginated, sortable, and filterable list of the authenticated user's contacts.
 
 **Query Parameters:**
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `page` | number | `1` | Page number |
-| `perPage` | number | `10` | Items per page |
-| `sortBy` | string | `_id` | Sort field: `name`, `email`, `phoneNumber`, `contactType`, `isFavourite`, `createdAt`, `updatedAt` |
-| `sortOrder` | string | `asc` | Sort direction: `asc` or `desc` |
-| `type` | string | — | Filter by contact type: `work`, `home`, `personal` |
-| `isFavourite` | boolean | — | Filter by favourite: `true` or `false` |
-
-**Example request:**
-```
-GET /contacts?page=2&perPage=4&sortBy=name&sortOrder=asc&type=work&isFavourite=true
-```
+| Parameter     | Type    | Default     | Description |
+|---------------|---------|-------------|-------------|
+| `page`        | number  | `1`         | Page number |
+| `perPage`     | number  | `10`        | Items per page |
+| `sortBy`      | string  | `_id`       | Sort field: `name`, `email`, `phoneNumber`, `contactType`, `isFavourite`, `createdAt`, `updatedAt` |
+| `sortOrder`   | string  | `asc`       | Sort direction: `asc` or `desc` |
+| `type`        | string  | —           | Filter by contact type: `work`, `home`, `personal` |
+| `isFavourite` | boolean | —           | Filter by favourite: `true` or `false` |
 
 **Response `200`:**
 
@@ -112,24 +239,13 @@ GET /contacts?page=2&perPage=4&sortBy=name&sortOrder=asc&type=work&isFavourite=t
   "status": 200,
   "message": "Successfully found contacts!",
   "data": {
-    "data": [
-      {
-        "_id": "...",
-        "name": "John Doe",
-        "phoneNumber": "+1234567890",
-        "email": "john@example.com",
-        "isFavourite": true,
-        "contactType": "work",
-        "createdAt": "...",
-        "updatedAt": "..."
-      }
-    ],
-    "page": 2,
-    "perPage": 4,
-    "totalItems": 6,
-    "totalPages": 2,
-    "hasPreviousPage": true,
-    "hasNextPage": false
+    "data": [...],
+    "page": 1,
+    "perPage": 10,
+    "totalItems": 25,
+    "totalPages": 3,
+    "hasPreviousPage": false,
+    "hasNextPage": true
   }
 }
 ```
@@ -138,14 +254,14 @@ GET /contacts?page=2&perPage=4&sortBy=name&sortOrder=asc&type=work&isFavourite=t
 
 ### GET /contacts/:contactId
 
-Returns a single contact by ID.
+Returns a single contact by ID (must belong to the authenticated user).
 
 **Response `200`:**
 
 ```json
 {
   "status": 200,
-  "message": "Successfully found contact with id <contactId>!",
+  "message": "Successfully found contact with id <contactId>",
   "data": {
     "_id": "...",
     "name": "John Doe",
@@ -153,13 +269,14 @@ Returns a single contact by ID.
     "email": "john@example.com",
     "isFavourite": false,
     "contactType": "personal",
+    "userId": "...",
     "createdAt": "...",
     "updatedAt": "..."
   }
 }
 ```
 
-**Response `404` (contact not found):**
+**Response `404`:**
 
 ```json
 {
@@ -171,7 +288,7 @@ Returns a single contact by ID.
 
 ### POST /contacts
 
-Creates a new contact.
+Creates a new contact for the authenticated user.
 
 **Request body:**
 
@@ -198,6 +315,7 @@ Creates a new contact.
     "email": "john@example.com",
     "isFavourite": false,
     "contactType": "personal",
+    "userId": "...",
     "createdAt": "...",
     "updatedAt": "..."
   }
@@ -208,7 +326,7 @@ Creates a new contact.
 
 ### PATCH /contacts/:contactId
 
-Partially updates an existing contact. Only send the fields you want to change.
+Partially updates a contact. Only send the fields you want to change.
 
 **Request body (example):**
 
@@ -224,20 +342,11 @@ Partially updates an existing contact. Only send the fields you want to change.
 {
   "status": 200,
   "message": "Successfully patched a contact!",
-  "data": {
-    "_id": "...",
-    "name": "John Doe",
-    "phoneNumber": "+1234567890",
-    "email": "newemail@example.com",
-    "isFavourite": false,
-    "contactType": "personal",
-    "createdAt": "...",
-    "updatedAt": "..."
-  }
+  "data": { ... }
 }
 ```
 
-**Response `404` (contact not found):**
+**Response `404`:**
 
 ```json
 {
@@ -253,7 +362,7 @@ Deletes a contact by ID.
 
 **Response `204`:** No content.
 
-**Response `404` (contact not found):**
+**Response `404`:**
 
 ```json
 {
@@ -261,32 +370,61 @@ Deletes a contact by ID.
 }
 ```
 
-## Contact Model
+---
 
-| Field         | Type    | Required | Default      | Notes                            |
-| ------------- | ------- | -------- | ------------ | -------------------------------- |
-| `name`        | String  | Yes      | —            |                                  |
-| `phoneNumber` | String  | Yes      | —            |                                  |
-| `email`       | String  | No       | —            |                                  |
-| `isFavourite` | Boolean | No       | `false`      |                                  |
-| `contactType` | String  | Yes      | `"personal"` | Enum: `work`, `home`, `personal` |
-| `createdAt`   | Date    | —        | auto         | Auto-generated by `timestamps`   |
-| `updatedAt`   | Date    | —        | auto         | Auto-generated by `timestamps`   |
+## Models
+
+### User
+
+| Field      | Type   | Required | Notes              |
+|------------|--------|----------|--------------------|
+| `name`     | String | Yes      |                    |
+| `email`    | String | Yes      | Must be unique     |
+| `password` | String | Yes      | Stored as bcrypt hash |
+
+### Session
+
+| Field                   | Type     | Required | Notes                        |
+|-------------------------|----------|----------|------------------------------|
+| `userId`                | ObjectId | Yes      | Reference to User            |
+| `accessToken`           | String   | Yes      | Expires in 15 minutes        |
+| `refreshToken`          | String   | Yes      | Expires in 30 days           |
+| `accessTokenValidUntil` | Date     | Yes      |                              |
+| `refreshTokenValidUntil`| Date     | Yes      |                              |
+
+### Contact
+
+| Field         | Type     | Required | Default      | Notes                            |
+|---------------|----------|----------|--------------|----------------------------------|
+| `name`        | String   | Yes      | —            |                                  |
+| `phoneNumber` | String   | Yes      | —            |                                  |
+| `email`       | String   | No       | —            |                                  |
+| `isFavourite` | Boolean  | No       | `false`      |                                  |
+| `contactType` | String   | Yes      | `"personal"` | Enum: `work`, `home`, `personal` |
+| `userId`      | ObjectId | Yes      | —            | Reference to User                |
+| `createdAt`   | Date     | —        | auto         | Auto-generated by `timestamps`   |
+| `updatedAt`   | Date     | —        | auto         | Auto-generated by `timestamps`   |
+
+---
 
 ## Dependencies
 
-| Package     | Purpose                       |
-| ----------- | ----------------------------- |
-| `express`   | Web framework                 |
-| `mongoose`  | MongoDB ODM                   |
-| `dotenv`    | Environment variable loading  |
-| `cors`      | Cross-origin resource sharing |
-| `pino-http` | HTTP request logging          |
+| Package        | Purpose                       |
+|----------------|-------------------------------|
+| `express`      | Web framework                 |
+| `mongoose`     | MongoDB ODM                   |
+| `bcrypt`       | Password hashing              |
+| `cookie-parser`| Cookie parsing middleware     |
+| `http-errors`  | HTTP error creation           |
+| `joi`          | Request body validation       |
+| `dotenv`       | Environment variable loading  |
+| `cors`         | Cross-origin resource sharing |
+| `pino-http`    | HTTP request logging          |
 
 ## Dev Dependencies
 
 | Package       | Purpose                   |
-| ------------- | ------------------------- |
+|---------------|---------------------------|
 | `nodemon`     | Auto-restart on file save |
 | `pino-pretty` | Pretty log formatting     |
 | `eslint`      | Code linting              |
