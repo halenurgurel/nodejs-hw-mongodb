@@ -30,3 +30,5 @@ router.post('/refresh', ctrlWrapper(refreshUserController));
 
 //delete the session based on id and token which is saved in cookies
 router.post('/logout', ctrlWrapper(logoutUserController));
+
+export default router;
