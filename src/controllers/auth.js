@@ -3,7 +3,7 @@ import {
   logoutUser,
   refreshUsersSession,
   registerUser,
-} from '../services/auth';
+} from '../services/auth.js';
 
 //helper function for res.cookie
 const setupSession = (res, session) => {
