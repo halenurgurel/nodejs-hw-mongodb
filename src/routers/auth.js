@@ -6,7 +6,7 @@ import {
   loginUserController,
   refreshUserController,
   logoutUserController,
-} from '../controllers/auth';
+} from '../controllers/auth.js';
 import { ctrlWrapper } from '../utils/ctrlWrapper.js';
 
 const router = Router();
