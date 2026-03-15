@@ -22,8 +22,7 @@ const setupSession = (res, session) => {
 export const registerUserController = async (req, res) => {
   const user = await registerUser(req.body);
 
-  const userData = user.toObject();
-  delete userData.password;
+  const { _password, userData } = user.toObject();
 
   res.status(201).json({
     status: 201,
