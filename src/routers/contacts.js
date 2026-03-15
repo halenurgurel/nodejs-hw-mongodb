@@ -12,6 +12,7 @@ import { createContactSchema } from '../validation/contacts.js';
 import { updateStudentSchema } from '../validation/contacts.js';
 import { isValidId } from '../middlewares/isValid.js';
 import { authenticate } from '../middlewares/authenticate.js';
+import { upload } from '../middlewares/upload.js';
 
 const router = Router();
 router.use(ctrlWrapper(authenticate));
@@ -24,12 +25,14 @@ router.get(
 );
 router.post(
   '/contacts',
+  upload.single('photo'),
   validateBody(createContactSchema),
   ctrlWrapper(createContactController),
 );
 router.patch(
   '/contacts/:contactId',
   isValidId,
+  upload.single('photo'),
   validateBody(updateStudentSchema),
   ctrlWrapper(updateContactController),
 );

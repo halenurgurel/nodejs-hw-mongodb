@@ -28,6 +28,9 @@ const Contact = new Schema(
       ref: 'users',
       required: true,
     },
+    photo: {
+      type: String,
+    },
   },
   {
     timestamps: true,

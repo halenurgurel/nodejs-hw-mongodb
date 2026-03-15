@@ -19,3 +19,6 @@ export const TEMPLATES_DIR = path.join(process.cwd(), 'src', 'templates');
 
 //5 minutes token
 export const FIVE_MINUTES = 5 * 60; //jwt uses seconds not miliseconds
+
+//temp directory
+export const TEMP_UPLOAD_DIR = path.join(process.cwd(), 'temp');

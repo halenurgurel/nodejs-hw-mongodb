@@ -73,7 +73,7 @@ export const loginUser = async (payload) => {
 export const requestResetToken = async (email) => {
   //check if user with this email exists
   const user = await UsersCollection.findOne({ email });
-  if (!user) throw createHttpError(404, 'User not found');
+  if (!user) throw createHttpError(404, 'User not found!');
 
   //create a jwt token containing the user's email, expxires in 5 minutes
   const resetToken = jwt.sign(
@@ -123,7 +123,7 @@ export const resetPassword = async ({ token, password }) => {
   try {
     entries = jwt.verify(token, env('JWT_SECRET'));
   } catch {
-    throw createHttpError(401, 'Token is expired or invalid');
+    throw createHttpError(401, 'Token is expired or invalid.');
   }
 
   //find user by email

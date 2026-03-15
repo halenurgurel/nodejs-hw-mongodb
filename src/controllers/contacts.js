@@ -10,6 +10,7 @@ import { parsePaginationParams } from '../utils/parsePaginationParams.js';
 import { calculatePaginationData } from '../utils/calculatePaginationData.js';
 import { parseSortParams } from '../utils/parseSortParams.js';
 import { parseFilterParams } from '../utils/parseFilterParams.js';
+import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 
 //GET 200 all contacts
 export const getAllContactsController = async (req, res) => {
@@ -64,7 +65,15 @@ export const getContactsByIdController = async (req, res) => {
 //POST 201 - create contact
 //req.body containt json data sent by the client and parsed by express
 export const createContactController = async (req, res) => {
-  const contact = await createContact({ ...req.body, userId: req.user._id });
+  //if a file uploaded -> upload it to Cloudinary and get back the URL
+  // if not, set photo to null
+  const photo = req.file ? await saveFileToCloudinary(req.file) : null;
+
+  const contact = await createContact({
+    ...req.body,
+    userId: req.user._id,
+    photo,
+  });
   res.status(201).json({
     status: 201,
     message: 'Successfully created a contact',
@@ -75,7 +84,14 @@ export const createContactController = async (req, res) => {
 //PATCH 200 - update contact
 export const updateContactController = async (req, res) => {
   const { contactId } = req.params;
-  const contact = await updateContact(contactId, req.user._id, req.body);
+  //if no photo sent, photo field won't be included in the update, that's why we write undefined
+  const photo = req.file ? await saveFileToCloudinary(req.file) : undefined;
+
+  const contact = await updateContact(contactId, req.user._id, {
+    ...req.body,
+    //if photo uploaded
+    ...(photo && { photo }),
+  });
 
   if (!contact) {
     throw createHttpError(404, 'Contact not found');

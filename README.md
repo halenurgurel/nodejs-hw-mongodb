@@ -30,13 +30,23 @@ Copy `.env.example` to `.env` and fill in your values:
 cp .env.example .env
 ```
 
-| Variable           | Description                | Example                      |
-| ------------------ | -------------------------- | ---------------------------- |
-| `PORT`             | Port the server listens on | `3000`                       |
-| `MONGODB_USER`     | MongoDB Atlas username     | `myuser`                     |
-| `MONGODB_PASSWORD` | MongoDB Atlas password     | `mypassword`                 |
-| `MONGODB_URL`      | MongoDB Atlas cluster URL  | `cluster0.xxxxx.mongodb.net` |
-| `MONGODB_DB`       | MongoDB database name      | `contacts-db`                |
+| Variable                | Description                              | Example                          |
+| ----------------------- | ---------------------------------------- | -------------------------------- |
+| `PORT`                  | Port the server listens on               | `3000`                           |
+| `MONGODB_USER`          | MongoDB Atlas username                   | `myuser`                         |
+| `MONGODB_PASSWORD`      | MongoDB Atlas password                   | `mypassword`                     |
+| `MONGODB_URL`           | MongoDB Atlas cluster URL                | `cluster0.xxxxx.mongodb.net`     |
+| `MONGODB_DB`            | MongoDB database name                    | `contacts-db`                    |
+| `SMTP_HOST`             | Brevo SMTP host                          | `smtp-relay.brevo.com`           |
+| `SMTP_PORT`             | Brevo SMTP port                          | `587`                            |
+| `SMTP_USER`             | Brevo SMTP login email                   | `your@email.com`                 |
+| `SMTP_PASSWORD`         | Brevo SMTP key                           | `xsmtpsib-...`                   |
+| `SMTP_FROM`             | Sender email (registered on Brevo)       | `your@email.com`                 |
+| `JWT_SECRET`            | Secret key for signing JWT tokens        | `VOQjLdrpG1TWCHhDzv3o`           |
+| `APP_DOMAIN`            | Frontend domain for reset password link  | `http://localhost:3000/auth`     |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name                    | `mycloud`                        |
+| `CLOUDINARY_API_KEY`    | Cloudinary API key                       | `123456789`                      |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret                    | `abc123...`                      |
 
 ### 4. Start the development server
 
@@ -73,13 +83,17 @@ src/
 │   ├── authenticate.js         # Bearer token authentication middleware
 │   ├── validateBody.js         # Joi request body validation middleware
 │   ├── isValid.js              # MongoDB ObjectId validation middleware
+│   ├── upload.js               # Multer middleware for multipart/form-data file uploads
 │   ├── notFoundHandler.js      # 404 handler for unknown routes
 │   └── errorHandler.js         # Global error handler
 ├── services/
 │   ├── contacts.js             # Contact database query functions
 │   └── auth.js                 # Auth database query functions
+├── templates/
+│   └── reset-password-email.html # Handlebars email template for password reset
+├── temp/                       # Temporary folder for multer file uploads
 ├── constants/
-│   └── index.js                # Shared constants (SORT_ORDER, FIFTEEN_MINUTES, THIRTY_DAYS)
+│   └── index.js                # Shared constants (SORT_ORDER, FIFTEEN_MINUTES, THIRTY_DAYS, FIVE_MINUTES, TEMPLATES_DIR, TEMP_UPLOAD_DIR)
 ├── validation/
 │   ├── contacts.js             # Joi validation schemas for contacts
 │   └── auth.js                 # Joi validation schemas for auth
@@ -89,7 +103,10 @@ src/
     ├── parsePaginationParams.js # Parses page and perPage from query string
     ├── calculatePaginationData.js # Calculates totalPages, hasPreviousPage, hasNextPage
     ├── parseSortParams.js      # Parses and validates sortBy and sortOrder
-    └── parseFilterParams.js    # Parses and validates type and isFavourite filters
+    ├── parseFilterParams.js    # Parses and validates type and isFavourite filters
+    ├── sendMail.js             # Nodemailer transporter for sending emails via Brevo SMTP
+    ├── cloudinary.js           # Cloudinary configuration
+    └── saveFileToCloudinary.js # Uploads a file to Cloudinary and returns the URL
 ```
 
 ## Authentication
@@ -213,6 +230,87 @@ Logs out the user by deleting the session and clearing cookies.
 
 ---
 
+### POST /auth/send-reset-email
+
+Sends a password reset email to the user with a JWT-signed link valid for 5 minutes.
+
+**Request body:**
+
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+**Response `200`:**
+
+```json
+{
+  "status": 200,
+  "message": "Reset password email has been successfully sent.",
+  "data": {}
+}
+```
+
+**Response `404` (user not found):**
+
+```json
+{
+  "message": "User not found!"
+}
+```
+
+**Response `500` (email failed to send):**
+
+```json
+{
+  "message": "Failed to send the email, please try again later."
+}
+```
+
+---
+
+### POST /auth/reset-pwd
+
+Resets the user's password using the JWT token from the reset email. Also deletes the user's current session.
+
+**Request body:**
+
+```json
+{
+  "token": "<jwt-token-from-email>",
+  "password": "newpassword123"
+}
+```
+
+**Response `200`:**
+
+```json
+{
+  "status": 200,
+  "message": "Password has been successfully reset.",
+  "data": {}
+}
+```
+
+**Response `401` (expired or invalid token):**
+
+```json
+{
+  "message": "Token is expired or invalid."
+}
+```
+
+**Response `404` (user not found):**
+
+```json
+{
+  "message": "User not found!"
+}
+```
+
+---
+
 ## Contact Endpoints
 
 All contact endpoints require `Authorization: Bearer <accessToken>` header. Users can only access their own contacts.
@@ -288,19 +386,18 @@ Returns a single contact by ID (must belong to the authenticated user).
 
 ### POST /contacts
 
-Creates a new contact for the authenticated user.
+Creates a new contact for the authenticated user. Supports optional photo upload via `multipart/form-data`.
 
-**Request body:**
+**Request body (`multipart/form-data`):**
 
-```json
-{
-  "name": "John Doe",
-  "phoneNumber": "+1234567890",
-  "email": "john@example.com",
-  "isFavourite": false,
-  "contactType": "personal"
-}
-```
+| Field         | Type   | Required |
+|---------------|--------|----------|
+| `name`        | text   | Yes      |
+| `phoneNumber` | text   | Yes      |
+| `email`       | text   | No       |
+| `isFavourite` | text   | No       |
+| `contactType` | text   | No       |
+| `photo`       | file   | No       |
 
 **Response `201`:**
 
@@ -315,6 +412,7 @@ Creates a new contact for the authenticated user.
     "email": "john@example.com",
     "isFavourite": false,
     "contactType": "personal",
+    "photo": "https://res.cloudinary.com/...",
     "userId": "...",
     "createdAt": "...",
     "updatedAt": "..."
@@ -326,15 +424,14 @@ Creates a new contact for the authenticated user.
 
 ### PATCH /contacts/:contactId
 
-Partially updates a contact. Only send the fields you want to change.
+Partially updates a contact. Supports optional photo upload via `multipart/form-data`. Only send the fields you want to change. If no photo is sent, the existing photo is preserved.
 
-**Request body (example):**
+**Request body (`multipart/form-data`, example):**
 
-```json
-{
-  "email": "newemail@example.com"
-}
-```
+| Field  | Type | Required |
+|--------|------|----------|
+| `name` | text | No       |
+| `photo`| file | No       |
 
 **Response `200`:**
 
@@ -401,6 +498,7 @@ Deletes a contact by ID.
 | `email`       | String   | No       | —            |                                  |
 | `isFavourite` | Boolean  | No       | `false`      |                                  |
 | `contactType` | String   | Yes      | `"personal"` | Enum: `work`, `home`, `personal` |
+| `photo`       | String   | No       | —            | Cloudinary URL                   |
 | `userId`      | ObjectId | Yes      | —            | Reference to User                |
 | `createdAt`   | Date     | —        | auto         | Auto-generated by `timestamps`   |
 | `updatedAt`   | Date     | —        | auto         | Auto-generated by `timestamps`   |
@@ -409,17 +507,22 @@ Deletes a contact by ID.
 
 ## Dependencies
 
-| Package        | Purpose                       |
-|----------------|-------------------------------|
-| `express`      | Web framework                 |
-| `mongoose`     | MongoDB ODM                   |
-| `bcrypt`       | Password hashing              |
-| `cookie-parser`| Cookie parsing middleware     |
-| `http-errors`  | HTTP error creation           |
-| `joi`          | Request body validation       |
-| `dotenv`       | Environment variable loading  |
-| `cors`         | Cross-origin resource sharing |
-| `pino-http`    | HTTP request logging          |
+| Package        | Purpose                                        |
+|----------------|------------------------------------------------|
+| `express`      | Web framework                                  |
+| `mongoose`     | MongoDB ODM                                    |
+| `bcrypt`       | Password hashing                               |
+| `cookie-parser`| Cookie parsing middleware                      |
+| `http-errors`  | HTTP error creation                            |
+| `joi`          | Request body validation                        |
+| `dotenv`       | Environment variable loading                   |
+| `cors`         | Cross-origin resource sharing                  |
+| `pino-http`    | HTTP request logging                           |
+| `nodemailer`   | Sending emails via SMTP (Brevo)                |
+| `jsonwebtoken` | Signing and verifying JWT tokens               |
+| `handlebars`   | HTML email templating                          |
+| `multer`       | Handling multipart/form-data file uploads      |
+| `cloudinary`   | Uploading and storing images in the cloud      |
 
 ## Dev Dependencies
 
