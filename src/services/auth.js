@@ -2,8 +2,19 @@ import createHttpError from 'http-errors';
 import { UsersCollection } from '../db/models/user.js';
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto'; //node's built-in crypto modules to generate tokens
-import { FIFTEEN_MINUTES, THIRTY_DAYS } from '../constants/index.js';
+import {
+  FIFTEEN_MINUTES,
+  FIVE_MINUTES,
+  TEMPLATES_DIR,
+  THIRTY_DAYS,
+} from '../constants/index.js';
 import { SessionsCollection } from '../db/models/session.js';
+import jwt from 'jsonwebtoken';
+import { env } from '../utils/env.js';
+import { sendMail } from '../utils/sendMail.js';
+import path from 'node:path';
+import handlebars from 'handlebars';
+import fs from 'node:fs/promises';
 
 //helper function to create new session
 const createSession = () => {
@@ -35,7 +46,7 @@ export const registerUser = async (payload) => {
   });
 };
 
-//Login Helper Function
+//Login Function
 //we will return 401 since we are not revealing that whether email exists in our system or not for safety reasons. We only say that credentials are invalid. User should know which one is wrong.
 export const loginUser = async (payload) => {
   const user = await UsersCollection.findOne({ email: payload.email });
@@ -56,6 +67,85 @@ export const loginUser = async (payload) => {
     userId: user._id,
     ...newSession,
   });
+};
+
+//reset token function
+export const requestResetToken = async (email) => {
+  //check if user with this email exists
+  const user = await UsersCollection.findOne({ email });
+  if (!user) throw createHttpError(404, 'User not found');
+
+  //create a jwt token containing the user's email, expxires in 5 minutes
+  const resetToken = jwt.sign(
+    {
+      sub: user._id,
+      email,
+    },
+    env('JWT_SECRET'),
+    { expiresIn: FIVE_MINUTES },
+  );
+
+  //importing reset-password-email.html
+  const resetPasswordTemplatePath = path.join(
+    TEMPLATES_DIR,
+    'reset-password-email.html',
+  );
+
+  //creating template source
+  const templateSource = await fs.readFile(resetPasswordTemplatePath, 'utf-8');
+
+  const template = handlebars.compile(templateSource);
+  const html = template({
+    name: user.name,
+    //build reset link
+    resetLink: `${env('APP_DOMAIN')}/reset-password?token=${resetToken}`,
+  });
+
+  //send the email
+  try {
+    await sendMail({
+      from: env('SMTP_FROM'),
+      to: email,
+      subject: 'Reset your password',
+      html,
+    });
+  } catch {
+    throw createHttpError(
+      500,
+      'Failed to send the email, please try again later.',
+    );
+  }
+};
+
+//reset password service
+export const resetPassword = async ({ token, password }) => {
+  let entries;
+  try {
+    entries = jwt.verify(token, env('JWT_SECRET'));
+  } catch {
+    throw createHttpError(401, 'Token is expired or invalid');
+  }
+
+  //find user by email
+  const user = await UsersCollection.findOne({
+    email: entries.email,
+  });
+  //if user is not exist
+  if (!user) throw createHttpError(404, 'User not found!');
+
+  //hash the new password
+  const encryptedPassword = await bcrypt.hash(password, 10);
+
+  //update users password
+  await UsersCollection.updateOne(
+    {
+      _id: user._id,
+    },
+    { password: encryptedPassword },
+  );
+
+  //delete users current session
+  await SessionsCollection.deleteOne({ userId: user._id });
 };
 
 //refresh users service
