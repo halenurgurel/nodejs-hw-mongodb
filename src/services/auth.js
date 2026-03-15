@@ -25,7 +25,7 @@ export const registerUser = async (payload) => {
   //if there is already an email registered on the system - we throw 409 to specify that email is already using in the system.
   if (user) throw createHttpError(409, 'Email in use');
 
-  //encrypted password - using bcrypt.has to encrypt the plain-text password with salt round of 10. This means the raw password is never stored in the database
+  //encrypted password - using bcrypt.hash to encrypt the plain-text password with salt round of 10. This means the raw password is never stored in the database
   const encryptedPassword = await bcrypt.hash(payload.password, 10);
 
   //user creation section - spreads the original payload (name, email etc) into new document. however replaces password with the hashed version. and then saves to the UsersCollection
