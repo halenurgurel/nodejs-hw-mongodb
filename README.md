@@ -505,6 +505,49 @@ Deletes a contact by ID.
 
 ---
 
+## API Documentation
+
+Interactive API documentation is available via Swagger UI at:
+
+```
+http://localhost:3000/api-docs
+```
+
+To rebuild the bundled `swagger.json` after making changes to the OpenAPI spec:
+
+```bash
+npm run build
+```
+
+The OpenAPI spec is written in YAML and split across:
+
+```
+docs/
+└── openapi.yaml                  # Root spec file
+swagger/
+├── paths/
+│   ├── contacts/                 # Contact endpoint definitions
+│   │   ├── get.yaml
+│   │   ├── post.yaml
+│   │   └── {id}/
+│   │       ├── get.yaml
+│   │       ├── patch.yaml
+│   │       └── delete.yaml
+│   └── auth/                     # Auth endpoint definitions
+│       ├── register.yaml
+│       ├── login.yaml
+│       ├── refresh.yaml
+│       ├── logout.yaml
+│       ├── send-reset-email.yaml
+│       └── reset-pwd.yaml
+└── components/
+    └── schemas/
+        ├── contact.yaml          # Contact schema
+        └── user.yaml             # User schema
+```
+
+---
+
 ## Dependencies
 
 | Package        | Purpose                                        |
@@ -523,6 +566,7 @@ Deletes a contact by ID.
 | `handlebars`   | HTML email templating                          |
 | `multer`       | Handling multipart/form-data file uploads      |
 | `cloudinary`   | Uploading and storing images in the cloud      |
+| `swagger-ui-express` | Serving Swagger UI at `/api-docs`        |
 
 ## Dev Dependencies
 
@@ -531,3 +575,4 @@ Deletes a contact by ID.
 | `nodemon`     | Auto-restart on file save |
 | `pino-pretty` | Pretty log formatting     |
 | `eslint`      | Code linting              |
+| `@redocly/cli` | Bundling and linting OpenAPI spec |

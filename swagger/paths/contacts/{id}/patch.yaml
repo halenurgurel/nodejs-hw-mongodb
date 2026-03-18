@@ -1,0 +1,64 @@
+tags:
+  - Contacts
+summary: Update contact by ID
+operationId: updateContact
+description: Updates a contact partially. All fields are optional
+security:
+  - bearerAuth: []
+parameters:
+  - name: id
+    in: path
+    required: true
+    description: the ID of the contact
+    schema:
+      type: string
+requestBody:
+  content:
+    multipart/form-data:
+      schema:
+        type: object
+        properties:
+          name:
+            type: string
+            minLength: 3
+            maxLength: 30
+            example: John Doe
+          phoneNumber:
+            type: string
+            minLength: 6
+            maxLength: 16
+            example: '+123456789'
+          email:
+            type: string
+            format: email
+            example: john@example.com
+          isFavourite:
+            type: boolean
+            example: false
+          contactType:
+            type: string
+            enum: [work, home, personal]
+            example: personal
+          photo:
+            type: string
+            format: binary
+responses:
+  '200':
+    description: Successfully patched contact
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            status:
+              type: integer
+              example: 200
+            message:
+              type: string
+              example: Successfully patched a contact!
+            data:
+              $ref: '../../../components/schemas/contact.yaml'
+  '401':
+    description: Unauthorized - missing or invalid token
+  '404':
+    description: Contact not found

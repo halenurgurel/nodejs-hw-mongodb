@@ -1,0 +1,60 @@
+tags:
+  - Contacts
+summary: Add contact
+operationId: createContact
+description: Adds a contact
+security:
+  - bearerAuth: []
+requestBody:
+  required: true
+  content:
+    multipart/form-data:
+      schema:
+        type: object
+        required:
+          - name
+          - phoneNumber
+          - contactType
+        properties:
+          name:
+            type: string
+            minLength: 3
+            maxLength: 30
+            example: John Doe
+          phoneNumber:
+            type: string
+            minLength: 6
+            maxLength: 16
+            example: '+123456789'
+          email:
+            type: string
+            format: email
+            example: john@example.com
+          isFavourite:
+            type: boolean
+            example: false
+          contactType:
+            type: string
+            enum: [work, home, personal]
+            example: personal
+          photo:
+            type: string
+            format: binary
+responses:
+  '201':
+    description: Successfully created a contact
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            status:
+              type: integer
+              example: 201
+            message:
+              type: string
+              example: Successfully created a contact!
+            data:
+              $ref: '../../components/schemas/contact.yaml'
+  '401':
+    description: Unauthorized - missing or invalid token
